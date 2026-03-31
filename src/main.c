@@ -2,7 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 
-typedef enum { EULER, RK4 } Method;
+typedef enum { RK1, RK2, RK3, RK4 } Method;
 static Method currentMethod = RK4;
 
 static const float G = 1.0f;
@@ -23,7 +23,13 @@ Vector2 ComputeGravitationalForce(const PointMass* a, const PointMass* b)
     return (Vector2){ direction.x / distance * forceMagnitude, direction.y / distance * forceMagnitude };
 }
 
-void UpdateEuler(PointMass* body1, PointMass* body2, const float dt)
+Vector2 ComputeAcceleration(const PointMass* body1, const PointMass* body2)
+{
+    const Vector2 force = ComputeGravitationalForce(body1, body2);
+    return (Vector2){ force.x / body1->mass, force.y / body1->mass };
+}
+
+void UpdateRK1(PointMass* body1, PointMass* body2, const float dt)
 {
     const Vector2 forceOn1 = ComputeGravitationalForce(body1, body2);
     const Vector2 forceOn2 = (Vector2){ -forceOn1.x, -forceOn1.y };
@@ -42,10 +48,100 @@ void UpdateEuler(PointMass* body1, PointMass* body2, const float dt)
     body2->position.y += body2->velocity.y * dt;
 }
 
-Vector2 ComputeAcceleration(const PointMass* body1, const PointMass* body2)
+void UpdateRK2_Midpoint(PointMass* body1, PointMass* body2, const float dt)
 {
-    const Vector2 force = ComputeGravitationalForce(body1, body2);
-    return (Vector2){ force.x / body1->mass, force.y / body1->mass };
+    Vector2 k1v1 = ComputeAcceleration(body1, body2);
+    Vector2 k1p1 = body1->velocity;
+
+    Vector2 k1v2 = ComputeAcceleration(body2, body1);
+    Vector2 k1p2 = body2->velocity;
+
+    PointMass mid1 = {
+        { body1->position.x + 0.5f * k1p1.x * dt, body1->position.y + 0.5f * k1p1.y * dt },
+        { body1->velocity.x + 0.5f * k1v1.x * dt, body1->velocity.y + 0.5f * k1v1.y * dt },
+        body1->mass
+    };
+
+    PointMass mid2 = {
+        { body2->position.x + 0.5f * k1p2.x * dt, body2->position.y + 0.5f * k1p2.y * dt },
+        { body2->velocity.x + 0.5f * k1v2.x * dt, body2->velocity.y + 0.5f * k1v2.y * dt },
+        body2->mass
+    };
+
+    Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
+    Vector2 k2p1 = mid1.velocity;
+
+    Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
+    Vector2 k2p2 = mid2.velocity;
+
+    body1->velocity.x += dt * k2v1.x;
+    body1->velocity.y += dt * k2v1.y;
+    body1->position.x += dt * k2p1.x;
+    body1->position.y += dt * k2p1.y;
+
+    body2->velocity.x += dt * k2v2.x;
+    body2->velocity.y += dt * k2v2.y;
+    body2->position.x += dt * k2p2.x;
+    body2->position.y += dt * k2p2.y;
+}
+
+void UpdateRK3_Classic(PointMass* body1, PointMass* body2, const float dt)
+{
+    Vector2 k1v1 = ComputeAcceleration(body1, body2);
+    Vector2 k1p1 = body1->velocity;
+
+    Vector2 k1v2 = ComputeAcceleration(body2, body1);
+    Vector2 k1p2 = body2->velocity;
+
+    PointMass mid1 = {
+        { body1->position.x + 0.5f * k1p1.x * dt, body1->position.y + 0.5f * k1p1.y * dt },
+        { body1->velocity.x + 0.5f * k1v1.x * dt, body1->velocity.y + 0.5f * k1v1.y * dt },
+        body1->mass
+    };
+
+    PointMass mid2 = {
+        { body2->position.x + 0.5f * k1p2.x * dt, body2->position.y + 0.5f * k1p2.y * dt },
+        { body2->velocity.x + 0.5f * k1v2.x * dt, body2->velocity.y + 0.5f * k1v2.y * dt },
+        body2->mass
+    };
+
+    Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
+    Vector2 k2p1 = mid1.velocity;
+
+    Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
+    Vector2 k2p2 = mid2.velocity;
+
+    PointMass end1 = {
+        { body1->position.x + dt * (-k1p1.x + 2.0f * k2p1.x),
+          body1->position.y + dt * (-k1p1.y + 2.0f * k2p1.y) },
+        { body1->velocity.x + dt * (-k1v1.x + 2.0f * k2v1.x),
+          body1->velocity.y + dt * (-k1v1.y + 2.0f * k2v1.y) },
+        body1->mass
+    };
+
+    PointMass end2 = {
+        { body2->position.x + dt * (-k1p2.x + 2.0f * k2p2.x),
+          body2->position.y + dt * (-k1p2.y + 2.0f * k2p2.y) },
+        { body2->velocity.x + dt * (-k1v2.x + 2.0f * k2v2.x),
+          body2->velocity.y + dt * (-k1v2.y + 2.0f * k2v2.y) },
+        body2->mass
+    };
+
+    Vector2 k3v1 = ComputeAcceleration(&end1, &end2);
+    Vector2 k3p1 = end1.velocity;
+
+    Vector2 k3v2 = ComputeAcceleration(&end2, &end1);
+    Vector2 k3p2 = end2.velocity;
+
+    body1->velocity.x += (dt / 6.0f) * (k1v1.x + 4.0f * k2v1.x + k3v1.x);
+    body1->velocity.y += (dt / 6.0f) * (k1v1.y + 4.0f * k2v1.y + k3v1.y);
+    body1->position.x += (dt / 6.0f) * (k1p1.x + 4.0f * k2p1.x + k3p1.x);
+    body1->position.y += (dt / 6.0f) * (k1p1.y + 4.0f * k2p1.y + k3p1.y);
+
+    body2->velocity.x += (dt / 6.0f) * (k1v2.x + 4.0f * k2v2.x + k3v2.x);
+    body2->velocity.y += (dt / 6.0f) * (k1v2.y + 4.0f * k2v2.y + k3v2.y);
+    body2->position.x += (dt / 6.0f) * (k1p2.x + 4.0f * k2p2.x + k3p2.x);
+    body2->position.y += (dt / 6.0f) * (k1p2.y + 4.0f * k2p2.y + k3p2.y);
 }
 
 void UpdateRK4(PointMass* body1, PointMass* body2, const float dt)
@@ -152,10 +248,14 @@ int main()
 
     while (!WindowShouldClose()) 
     {
-        if (IsKeyPressed(KEY_ONE)) currentMethod = EULER;
-        if (IsKeyPressed(KEY_TWO)) currentMethod = RK4;
+        if (IsKeyPressed(KEY_ONE)) currentMethod = RK1;
+        if (IsKeyPressed(KEY_TWO)) currentMethod = RK2;
+        if (IsKeyPressed(KEY_THREE)) currentMethod = RK3;
+        if (IsKeyPressed(KEY_FOUR)) currentMethod = RK4;
 
-        if (currentMethod == EULER) UpdateEuler(&body1, &body2, TIME_STEP);
+        if (currentMethod == RK1) UpdateRK1(&body1, &body2, TIME_STEP);
+        else if (currentMethod == RK2) UpdateRK2_Midpoint(&body1, &body2, TIME_STEP);
+        else if (currentMethod == RK3) UpdateRK3_Classic(&body1, &body2, TIME_STEP);
         else if (currentMethod == RK4) UpdateRK4(&body1, &body2, TIME_STEP);
 
         const float kineticEnergy = ComputeKineticEnergy(&body1) + ComputeKineticEnergy(&body2);
@@ -176,7 +276,7 @@ int main()
         snprintf(text2, sizeof(text2), "Potential Energy: %s", potentialStr);
         snprintf(text3, sizeof(text3), "Total Energy: %s", totalStr);
 
-        DrawText(currentMethod == EULER ? "Method: Euler" : "Method: RK4", 10, 10, 20, BLACK);
+        DrawText(currentMethod == RK1 ? "Method: Euler" : "Method: RK4", 10, 10, 20, BLACK);
         DrawText("Press 1 for Euler, 2 for RK4", 10, 40, 20, BLACK);
         DrawText(text1, 10, 80, 20, BLACK);
         DrawText(text2, 10, 110, 20, BLACK);
