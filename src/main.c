@@ -3,10 +3,10 @@
 #include <stdio.h>
 
 typedef enum { RK1, RK2, RK3, RK4 } Method;
-static Method currentMethod = RK4;
+static Method currentMethod = RK1;
 
 static const float G = 1.0f;
-static const float TIME_STEP = 5.0f;
+static const float TIME_STEP = 60.0f;
 
 typedef struct {
     Vector2 position;
@@ -31,11 +31,10 @@ Vector2 ComputeAcceleration(const PointMass* body1, const PointMass* body2)
 
 void UpdateRK1(PointMass* body1, PointMass* body2, const float dt)
 {
-    const Vector2 forceOn1 = ComputeGravitationalForce(body1, body2);
-    const Vector2 forceOn2 = (Vector2){ -forceOn1.x, -forceOn1.y };
+    const Vector2 force = ComputeGravitationalForce(body1, body2);
 
-    const Vector2 acceleration1 = (Vector2){ forceOn1.x / body1->mass, forceOn1.y / body1->mass };
-    const Vector2 acceleration2 = (Vector2){ forceOn2.x / body2->mass, forceOn2.y / body2->mass };
+    const Vector2 acceleration1 = (Vector2){ force.x / body1->mass, force.y / body1->mass };
+    const Vector2 acceleration2 = (Vector2){ -force.x / body2->mass, -force.y / body2->mass };
 
     body1->velocity.x += acceleration1.x * dt;
     body1->velocity.y += acceleration1.y * dt;
@@ -50,29 +49,29 @@ void UpdateRK1(PointMass* body1, PointMass* body2, const float dt)
 
 void UpdateRK2_Midpoint(PointMass* body1, PointMass* body2, const float dt)
 {
-    Vector2 k1v1 = ComputeAcceleration(body1, body2);
-    Vector2 k1p1 = body1->velocity;
+    const Vector2 k1v1 = ComputeAcceleration(body1, body2);
+    const Vector2 k1p1 = body1->velocity;
 
-    Vector2 k1v2 = ComputeAcceleration(body2, body1);
-    Vector2 k1p2 = body2->velocity;
+    const Vector2 k1v2 = ComputeAcceleration(body2, body1);
+    const Vector2 k1p2 = body2->velocity;
 
-    PointMass mid1 = {
+    const PointMass mid1 = {
         { body1->position.x + 0.5f * k1p1.x * dt, body1->position.y + 0.5f * k1p1.y * dt },
         { body1->velocity.x + 0.5f * k1v1.x * dt, body1->velocity.y + 0.5f * k1v1.y * dt },
         body1->mass
     };
 
-    PointMass mid2 = {
+    const PointMass mid2 = {
         { body2->position.x + 0.5f * k1p2.x * dt, body2->position.y + 0.5f * k1p2.y * dt },
         { body2->velocity.x + 0.5f * k1v2.x * dt, body2->velocity.y + 0.5f * k1v2.y * dt },
         body2->mass
     };
 
-    Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
-    Vector2 k2p1 = mid1.velocity;
+    const Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
+    const Vector2 k2p1 = mid1.velocity;
 
-    Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
-    Vector2 k2p2 = mid2.velocity;
+    const Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
+    const Vector2 k2p2 = mid2.velocity;
 
     body1->velocity.x += dt * k2v1.x;
     body1->velocity.y += dt * k2v1.y;
@@ -85,33 +84,43 @@ void UpdateRK2_Midpoint(PointMass* body1, PointMass* body2, const float dt)
     body2->position.y += dt * k2p2.y;
 }
 
+void UpdateRK2_Heun(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK2_Ralston(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
 void UpdateRK3_Classic(PointMass* body1, PointMass* body2, const float dt)
 {
-    Vector2 k1v1 = ComputeAcceleration(body1, body2);
-    Vector2 k1p1 = body1->velocity;
+    const Vector2 k1v1 = ComputeAcceleration(body1, body2);
+    const Vector2 k1p1 = body1->velocity;
 
-    Vector2 k1v2 = ComputeAcceleration(body2, body1);
-    Vector2 k1p2 = body2->velocity;
+    const Vector2 k1v2 = ComputeAcceleration(body2, body1);
+    const Vector2 k1p2 = body2->velocity;
 
-    PointMass mid1 = {
+    const PointMass mid1 = {
         { body1->position.x + 0.5f * k1p1.x * dt, body1->position.y + 0.5f * k1p1.y * dt },
         { body1->velocity.x + 0.5f * k1v1.x * dt, body1->velocity.y + 0.5f * k1v1.y * dt },
         body1->mass
     };
 
-    PointMass mid2 = {
+    const PointMass mid2 = {
         { body2->position.x + 0.5f * k1p2.x * dt, body2->position.y + 0.5f * k1p2.y * dt },
         { body2->velocity.x + 0.5f * k1v2.x * dt, body2->velocity.y + 0.5f * k1v2.y * dt },
         body2->mass
     };
 
-    Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
-    Vector2 k2p1 = mid1.velocity;
+    const Vector2 k2v1 = ComputeAcceleration(&mid1, &mid2);
+    const Vector2 k2p1 = mid1.velocity;
 
-    Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
-    Vector2 k2p2 = mid2.velocity;
+    const Vector2 k2v2 = ComputeAcceleration(&mid2, &mid1);
+    const Vector2 k2p2 = mid2.velocity;
 
-    PointMass end1 = {
+    const PointMass end1 = {
         { body1->position.x + dt * (-k1p1.x + 2.0f * k2p1.x),
           body1->position.y + dt * (-k1p1.y + 2.0f * k2p1.y) },
         { body1->velocity.x + dt * (-k1v1.x + 2.0f * k2v1.x),
@@ -119,7 +128,7 @@ void UpdateRK3_Classic(PointMass* body1, PointMass* body2, const float dt)
         body1->mass
     };
 
-    PointMass end2 = {
+    const PointMass end2 = {
         { body2->position.x + dt * (-k1p2.x + 2.0f * k2p2.x),
           body2->position.y + dt * (-k1p2.y + 2.0f * k2p2.y) },
         { body2->velocity.x + dt * (-k1v2.x + 2.0f * k2v2.x),
@@ -127,11 +136,11 @@ void UpdateRK3_Classic(PointMass* body1, PointMass* body2, const float dt)
         body2->mass
     };
 
-    Vector2 k3v1 = ComputeAcceleration(&end1, &end2);
-    Vector2 k3p1 = end1.velocity;
+    const Vector2 k3v1 = ComputeAcceleration(&end1, &end2);
+    const Vector2 k3p1 = end1.velocity;
 
-    Vector2 k3v2 = ComputeAcceleration(&end2, &end1);
-    Vector2 k3p2 = end2.velocity;
+    const Vector2 k3v2 = ComputeAcceleration(&end2, &end1);
+    const Vector2 k3p2 = end2.velocity;
 
     body1->velocity.x += (dt / 6.0f) * (k1v1.x + 4.0f * k2v1.x + k3v1.x);
     body1->velocity.y += (dt / 6.0f) * (k1v1.y + 4.0f * k2v1.y + k3v1.y);
@@ -142,6 +151,26 @@ void UpdateRK3_Classic(PointMass* body1, PointMass* body2, const float dt)
     body2->velocity.y += (dt / 6.0f) * (k1v2.y + 4.0f * k2v2.y + k3v2.y);
     body2->position.x += (dt / 6.0f) * (k1p2.x + 4.0f * k2p2.x + k3p2.x);
     body2->position.y += (dt / 6.0f) * (k1p2.y + 4.0f * k2p2.y + k3p2.y);
+}
+
+void UpdateRK3_Heun(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK3_Ralston(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK3_HouwenWray(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK3_Strong_Stability_Preserving(PointMass* body1, PointMass* body2, const float dt)
+{
+
 }
 
 void UpdateRK4(PointMass* body1, PointMass* body2, const float dt)
@@ -201,6 +230,21 @@ void UpdateRK4(PointMass* body1, PointMass* body2, const float dt)
     body2->position.y += (dt / 6.0f) * (k1p2.y + 2 * k2p2.y + 2 * k3p2.y + k4p2.y);
 }
 
+void UpdateRK4_3_8(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK4_Ralston(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
+void UpdateRK5_Nystrom(PointMass* body1, PointMass* body2, const float dt)
+{
+
+}
+
 float ComputeKineticEnergy(const PointMass* body)
 {
     const float speedSquared = body->velocity.x * body->velocity.x + body->velocity.y * body->velocity.y;
@@ -220,19 +264,35 @@ void FormatFloat(char* buffer, const size_t size, const float value, const int p
     snprintf(buffer, size, "%.*f", precision, value);
 }
 
-char kineticStr[64];
-char potentialStr[64];
-char totalStr[64];
-char text1[128];
-char text2[128];
-char text3[128];
+static char kineticStr[64];
+static char potentialStr[64];
+static char totalStr[64];
+static char text1[128];
+static char text2[128];
+static char text3[128];
+
+static const char* str = "";
+
+void ResetBodies(PointMass* body1, PointMass* body2)
+{
+    const Vector2 centerMass = (Vector2){400, 300};
+
+    *body1 = (PointMass){ { centerMass.x - 100, centerMass.y }, { 0, 0 }, 10.0f };
+    *body2 = (PointMass){ { centerMass.x + 100, centerMass.y }, { 0, 0 }, 10.0f };
+
+    const float distance1 = sqrtf(powf(body2->position.x - body1->position.x, 2) + powf(body2->position.y - body1->position.y, 2));
+    const float orbitalSpeed1 = sqrtf(G * (body1->mass + body2->mass) / distance1);
+
+    body1->velocity = (Vector2){ 0, -orbitalSpeed1 * (body2->mass / (body1->mass + body2->mass)) };
+    body2->velocity = (Vector2){ 0, orbitalSpeed1 * (body1->mass / (body1->mass + body2->mass)) };
+}
 
 int main()
 {
     const int screenWidth = 800;
     const int screenHeight = 600;
 
-    InitWindow(screenWidth, screenHeight, "2D Physics Examples");
+    InitWindow(screenWidth, screenHeight, "GABRK");
     SetTargetFPS(60);
 
     const Vector2 centerMass = (Vector2){400, 300};
@@ -248,15 +308,30 @@ int main()
 
     while (!WindowShouldClose()) 
     {
-        if (IsKeyPressed(KEY_ONE)) currentMethod = RK1;
-        if (IsKeyPressed(KEY_TWO)) currentMethod = RK2;
-        if (IsKeyPressed(KEY_THREE)) currentMethod = RK3;
-        if (IsKeyPressed(KEY_FOUR)) currentMethod = RK4;
+        if (IsKeyPressed(KEY_ONE)) {
+            ResetBodies(&body1, &body2);
+            currentMethod = RK1;
+        }
+        if (IsKeyPressed(KEY_TWO)) {
+            ResetBodies(&body1, &body2);
+            currentMethod = RK2;
+        }
+        if (IsKeyPressed(KEY_THREE)) {
+            ResetBodies(&body1, &body2);
+            currentMethod = RK3;
+        }
+        if (IsKeyPressed(KEY_FOUR)) {
+            ResetBodies(&body1, &body2);
+            currentMethod = RK4;
+        }
 
-        if (currentMethod == RK1) UpdateRK1(&body1, &body2, TIME_STEP);
-        else if (currentMethod == RK2) UpdateRK2_Midpoint(&body1, &body2, TIME_STEP);
-        else if (currentMethod == RK3) UpdateRK3_Classic(&body1, &body2, TIME_STEP);
-        else if (currentMethod == RK4) UpdateRK4(&body1, &body2, TIME_STEP);
+        switch (currentMethod)
+        {
+            case RK1: UpdateRK1(&body1, &body2, TIME_STEP); break;
+            case RK2: UpdateRK2_Midpoint(&body1, &body2, TIME_STEP); break;
+            case RK3: UpdateRK3_Classic(&body1, &body2, TIME_STEP); break;
+            case RK4: UpdateRK4(&body1, &body2, TIME_STEP); break;
+        }
 
         const float kineticEnergy = ComputeKineticEnergy(&body1) + ComputeKineticEnergy(&body2);
         const float potentialEnergy = ComputePotentialEnergy(&body1, &body2);
@@ -276,13 +351,17 @@ int main()
         snprintf(text2, sizeof(text2), "Potential Energy: %s", potentialStr);
         snprintf(text3, sizeof(text3), "Total Energy: %s", totalStr);
 
-        DrawText(currentMethod == RK1 ? "Method: Euler" : "Method: RK4", 10, 10, 20, BLACK);
-        DrawText("Press 1 for Euler, 2 for RK4", 10, 40, 20, BLACK);
+        if (currentMethod == RK1) str = "Method: RK1";
+        else if (currentMethod == RK2) str = "Method: RK2";
+        else if (currentMethod == RK3) str = "Method: RK3";
+        else if (currentMethod == RK4) str = "Method: RK4";
+
+        DrawText(str, 10, 10, 20, BLACK);
         DrawText(text1, 10, 80, 20, BLACK);
         DrawText(text2, 10, 110, 20, BLACK);
         DrawText(text3, 10, 140, 20, BLACK);
 
-        DrawText("BACKSPACE to return, R to reset positions", 10, GetScreenHeight() - 25, 20, BLACK);
+        DrawText("ESC to quit", 10, GetScreenHeight() - 25, 20, BLACK);
         EndDrawing();
     }
 
